@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0b73a8">
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MH Modern Highline — Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet"/>
+  <script>
+  // Direct Supabase REST API — no library needed
+  const SUPA_URL = 'https://mttktqqcqunpaytyhzpi.supabase.co';
+  const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im10dGt0cXFjcXVucGF5dHloenBpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1MjU2NTAsImV4cCI6MjA5NTEwMTY1MH0.J-XD6eU_iDkUN0gDF7tS7hLYxumHHZ_zGZGRtezHHhQ';
+
+  async function supaAuth(email, password) {
+    const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
+      body: JSON.stringify({ email, password })
+    });
+    return res.json();
+  }
+
+  async function supaQuery(table, options = {}) {
+    let url = `${SUPA_URL}/rest/v1/${table}?`;
+    if (options.select) url += `select=${options.select}&`;
+    if (options.eq) Object.entries(options.eq).forEach(([k,v]) => url += `${k}=eq.${v}&`);
+    if (options.order) url += `order=${options.order}&`;
+    const token = sessionStorage.getItem('mh_token');
+    const res = await fetch(url, {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token||SUPA_KEY}`, 'Content-Type': 'application/json' }
+    });
+    return res.json();
+  }
+
+  async function supaInsert(table, data) {
+    const token = sessionStorage.getItem('mh_token');
+    const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token||SUPA_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(data)
+    });
+    return res.ok;
+  }
+
+  async function supaUpdate(table, data, eq) {
+    const token = sessionStorage.getItem('mh_token');
+    let url = `${SUPA_URL}/rest/v1/${table}?`;
+    Object.entries(eq).forEach(([k,v]) => url += `${k}=eq.${v}&`);
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token||SUPA_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return res.ok;
+  }
+  </script>
+  <style>
+    :root {
+      --blue:#0b73a8;--blue-dark:#085d88;--blue-light:#e8f4fb;--blue-mid:#1a8bc4;
+      --navy:#0a1628;--navy-mid:#0f2040;
+      --white:#fff;--off:#f4f7fa;--text:#0d1b2a;--muted:#4a5568;--light:#8a9bb0;--border:#e2e8f0;
+      --green:#10b981;--green-light:#d1fae5;
+      --orange:#f59e0b;--orange-light:#fef3c7;
+      --red:#ef4444;--red-light:#fee2e2;
+      --font:'Inter',sans-serif;--head:'Poppins',sans-serif;
+      --radius:12px;--shadow:0 4px 24px rgba(0,0,0,0.08);--shadow-lg:0 20px 60px rgba(0,0,0,0.12);
+    }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:var(--font);color:var(--text);background:var(--off);line-height:1.6;-webkit-font-smoothing:antialiased;}
+    .screen{display:none;min-height:100vh;}
+    .screen.active{display:flex;}
+
+    /* LOADER */
+    #app-loader{position:fixed;inset:0;background:var(--navy);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem;}
+    #app-loader img{height:50px;filter:brightness(0) invert(1);opacity:0.8;}
+    #app-loader p{color:rgba(255,255,255,0.4);font-size:0.85rem;letter-spacing:0.1em;}
+    .spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,0.1);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* LOGIN */
+    #login-screen{align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy) 0%,#0f2a45 100%);position:relative;overflow:hidden;}
+    #login-screen::before{content:'';position:absolute;right:-150px;top:-150px;width:600px;height:600px;border-radius:50%;border:1px solid rgba(255,255,255,0.04);box-shadow:0 0 0 80px rgba(255,255,255,0.03),0 0 0 160px rgba(255,255,255,0.02);}
+    .login-box{background:var(--white);border-radius:20px;padding:3rem;width:100%;max-width:440px;box-shadow:var(--shadow-lg);position:relative;z-index:1;}
+    .login-logo{display:flex;align-items:center;gap:0.75rem;margin-bottom:2rem;}
+    .login-logo img{height:40px;}
+    .login-logo span{font-family:var(--head);font-size:0.85rem;font-weight:700;color:var(--navy);letter-spacing:0.05em;text-transform:uppercase;line-height:1.2;}
+    .login-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:1.75rem;}
+    .login-tab{padding:0.65rem;border:2px solid var(--border);border-radius:8px;text-align:center;cursor:pointer;font-size:0.8rem;font-weight:600;color:var(--muted);transition:all 0.2s;}
+    .login-tab.active{border-color:var(--blue);background:var(--blue-light);color:var(--blue);}
+    .form-group{margin-bottom:1rem;}
+    .form-group label{display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:0.4rem;}
+    .form-group input{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:0.9rem;color:var(--text);outline:none;transition:border-color 0.2s,box-shadow 0.2s;}
+    .form-group input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(11,115,168,0.1);}
+    .login-btn{width:100%;padding:13px;font-family:var(--font);font-size:0.9rem;font-weight:700;background:var(--blue);color:var(--white);border:none;border-radius:8px;cursor:pointer;transition:all 0.2s;margin-top:0.5rem;}
+    .login-btn:hover{background:var(--blue-dark);transform:translateY(-1px);}
+    .login-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+    .login-error{background:#fee2e2;color:#dc2626;padding:0.75rem 1rem;border-radius:8px;font-size:0.85rem;margin-bottom:1rem;display:none;}
+    .login-success{background:#d1fae5;color:#059669;padding:0.75rem 1rem;border-radius:8px;font-size:0.85rem;margin-bottom:1rem;display:none;}
+    .login-switch{font-size:0.82rem;color:var(--muted);text-align:center;margin-top:1.25rem;}
+    .login-switch a{color:var(--blue);cursor:pointer;font-weight:600;}
+
+    /* DASHBOARD LAYOUT */
+    #admin-screen,#client-screen{flex-direction:row;}
+    .sidebar{width:260px;min-height:100vh;background:var(--navy);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;}
+    .sidebar-logo{padding:1.5rem;border-bottom:1px solid rgba(255,255,255,0.07);}
+    .sidebar-logo img{height:36px;filter:brightness(0) invert(1);opacity:0.85;}
+    .sidebar-logo .portal-badge{font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--blue-mid);margin-top:0.35rem;}
+    .sidebar-user{padding:1.25rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:0.75rem;}
+    .user-avatar{width:36px;height:36px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;color:var(--white);flex-shrink:0;}
+    .user-name{font-size:0.85rem;font-weight:600;color:var(--white);}
+    .user-role{font-size:0.7rem;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;}
+    .sidebar-nav{padding:1rem 0;flex:1;}
+    .nav-section-label{font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.25);padding:0.75rem 1.5rem 0.35rem;}
+    .nav-item{display:flex;align-items:center;gap:0.75rem;padding:0.7rem 1.5rem;font-size:0.85rem;font-weight:500;color:rgba(255,255,255,0.6);cursor:pointer;transition:all 0.2s;border-left:3px solid transparent;}
+    .nav-item:hover{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.9);}
+    .nav-item.active{background:rgba(11,115,168,0.2);color:var(--white);border-left-color:var(--blue);}
+    .nav-item .ni-icon{font-size:1rem;width:20px;text-align:center;}
+    .nav-item .ni-badge{margin-left:auto;background:var(--blue);color:var(--white);font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:10px;}
+    .sidebar-bottom{padding:1rem 1.5rem;border-top:1px solid rgba(255,255,255,0.07);}
+    .logout-btn{display:flex;align-items:center;gap:0.6rem;font-size:0.82rem;color:rgba(255,255,255,0.4);cursor:pointer;transition:color 0.2s;background:none;border:none;width:100%;}
+    .logout-btn:hover{color:rgba(255,255,255,0.8);}
+    .main{flex:1;overflow-y:auto;}
+    .main-header{background:var(--white);padding:1.25rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+    .main-header h1{font-family:var(--head);font-size:1.1rem;font-weight:700;color:var(--navy);}
+    .header-badge{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;background:var(--blue-light);color:var(--blue);padding:5px 12px;border-radius:20px;}
+    .main-body{padding:2rem;}
+    .panel{display:none;}
+    .panel.active{display:block;}
+
+    /* STAT CARDS */
+    .stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;margin-bottom:2rem;}
+    .stat-card{background:var(--white);border-radius:var(--radius);padding:1.5rem;box-shadow:var(--shadow);display:flex;align-items:flex-start;gap:1rem;}
+    .stat-card-icon{width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;}
+    .stat-card-num{font-family:var(--head);font-size:1.8rem;font-weight:800;color:var(--navy);line-height:1;}
+    .stat-card-label{font-size:0.78rem;color:var(--muted);margin-top:0.25rem;}
+
+    /* TABLE */
+    .data-table{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:1.5rem;}
+    .table-header{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);}
+    .table-header h3{font-family:var(--head);font-size:1rem;font-weight:700;color:var(--navy);}
+    .table-search{padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;outline:none;width:220px;}
+    table{width:100%;border-collapse:collapse;}
+    thead th{text-align:left;padding:0.85rem 1.5rem;font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--light);background:var(--off);border-bottom:1px solid var(--border);}
+    tbody td{padding:1rem 1.5rem;font-size:0.88rem;color:var(--muted);border-bottom:1px solid var(--border);}
+    tbody tr:last-child td{border-bottom:none;}
+    tbody tr:hover td{background:#fafbfc;}
+    .td-name{font-weight:600;color:var(--text);}
+    .empty-state{text-align:center;padding:3rem;color:var(--light);font-size:0.9rem;}
+
+    /* BADGES */
+    .badge{display:inline-block;font-size:0.7rem;font-weight:700;padding:3px 10px;border-radius:20px;}
+    .badge-new{background:var(--blue-light);color:var(--blue);}
+    .badge-pending{background:var(--orange-light);color:#d97706;}
+    .badge-done{background:var(--green-light);color:#059669;}
+    .badge-production{background:#ede9fe;color:#7c3aed;}
+    .badge-qa{background:var(--orange-light);color:#d97706;}
+    .badge-dispatched{background:var(--green-light);color:#059669;}
+    .badge-cancelled{background:var(--red-light);color:#dc2626;}
+
+    /* BUTTONS */
+    .action-btn{font-size:0.75rem;font-weight:600;padding:5px 12px;border-radius:6px;border:none;cursor:pointer;transition:all 0.15s;}
+    .action-btn-blue{background:var(--blue-light);color:var(--blue);}
+    .action-btn-blue:hover{background:var(--blue);color:var(--white);}
+    .action-btn-green{background:var(--green-light);color:#059669;}
+    .action-btn-green:hover{background:var(--green);color:var(--white);}
+    .action-btn-red{background:var(--red-light);color:#dc2626;}
+    .action-btn-red:hover{background:var(--red);color:var(--white);}
+    .submit-btn{background:var(--blue);color:var(--white);border:none;padding:12px 24px;border-radius:8px;font-size:0.88rem;font-weight:700;cursor:pointer;transition:all 0.2s;}
+    .submit-btn:hover{background:var(--blue-dark);}
+    .submit-btn:disabled{opacity:0.6;cursor:not-allowed;}
+
+    /* FORMS */
+    .form-panel{background:var(--white);border-radius:var(--radius);padding:2rem;box-shadow:var(--shadow);}
+    .form-panel h3{font-family:var(--head);font-size:1.1rem;font-weight:700;color:var(--navy);margin-bottom:1.5rem;}
+    .fp-group{margin-bottom:1.1rem;}
+    .fp-group label{display:block;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:0.4rem;}
+    .fp-group input,.fp-group select,.fp-group textarea{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:0.9rem;color:var(--text);outline:none;transition:border-color 0.2s;}
+    .fp-group input:focus,.fp-group select:focus,.fp-group textarea:focus{border-color:var(--blue);}
+    .fp-group textarea{min-height:100px;resize:vertical;}
+    .fp-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+    .success-msg{background:var(--green-light);color:#059669;padding:0.75rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:600;display:none;margin-top:1rem;}
+
+    /* ENQUIRY DETAIL */
+    .enquiry-detail{background:var(--white);border-radius:var(--radius);padding:1.75rem;box-shadow:var(--shadow);margin-top:1.5rem;}
+    .enquiry-detail h4{font-family:var(--head);font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:1rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border);}
+    .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
+    .detail-item label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--light);display:block;margin-bottom:0.2rem;}
+    .detail-item p{font-size:0.9rem;color:var(--text);}
+    .detail-message{background:var(--off);border-radius:8px;padding:1rem;font-size:0.88rem;color:var(--muted);line-height:1.7;}
+    .status-select{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;outline:none;cursor:pointer;}
+
+    /* ORDER TIMELINE */
+    .order-card{background:var(--white);border-radius:var(--radius);padding:1.75rem;box-shadow:var(--shadow);margin-bottom:1.5rem;}
+    .order-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;}
+    .order-timeline{position:relative;padding-left:2rem;}
+    .order-timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--border);}
+    .timeline-item{position:relative;margin-bottom:1.5rem;}
+    .timeline-dot{position:absolute;left:-1.6rem;top:4px;width:14px;height:14px;border-radius:50%;background:var(--border);border:2px solid var(--white);box-shadow:0 0 0 2px var(--border);}
+    .timeline-dot.active{box-shadow:0 0 0 2px var(--blue);background:var(--blue);}
+    .timeline-dot.done{background:var(--green);box-shadow:0 0 0 2px var(--green);}
+    .timeline-title{font-size:0.88rem;font-weight:600;color:var(--navy);}
+    .timeline-sub{font-size:0.78rem;color:var(--muted);}
+
+    /* DOCS */
+    .docs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;}
+    .doc-card{background:var(--white);border-radius:var(--radius);padding:1.5rem;box-shadow:var(--shadow);text-align:center;}
+    .doc-icon{font-size:2.5rem;margin-bottom:1rem;}
+    .doc-name{font-family:var(--head);font-size:0.9rem;font-weight:700;color:var(--navy);margin-bottom:0.25rem;}
+    .doc-size{font-size:0.75rem;color:var(--muted);margin-bottom:1rem;}
+    .doc-btn{display:inline-block;font-size:0.78rem;font-weight:700;padding:7px 16px;background:var(--blue-light);color:var(--blue);border-radius:6px;text-decoration:none;cursor:pointer;border:none;}
+    .doc-btn:hover{background:var(--blue);color:var(--white);}
+
+    /* NOTIFICATION */
+    .notif{position:fixed;top:1.5rem;right:1.5rem;background:var(--navy);color:var(--white);padding:1rem 1.5rem;border-radius:10px;font-size:0.88rem;font-weight:500;z-index:9999;transform:translateX(120%);transition:transform 0.3s;box-shadow:var(--shadow-lg);max-width:320px;}
+    .notif.show{transform:translateX(0);}
+    .notif.success{border-left:4px solid var(--green);}
+    .notif.error{border-left:4px solid var(--red);}
+
+    /* SECTION TITLE */
+    .section-title{margin-bottom:1.5rem;}
+    .section-title h2{font-family:var(--head);font-size:1.2rem;font-weight:700;color:var(--navy);}
+    .section-title p{font-size:0.85rem;color:var(--muted);margin-top:0.25rem;}
+
+    /* CLIENTS GRID */
+    .clients-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:2rem;}
+    .client-card-dash{background:var(--white);border-radius:var(--radius);padding:1.5rem;box-shadow:var(--shadow);border-left:4px solid var(--blue);}
+    .client-card-dash h4{font-family:var(--head);font-size:0.95rem;font-weight:700;color:var(--navy);margin-bottom:0.3rem;}
+    .client-card-dash .c-industry{font-size:0.75rem;color:var(--blue);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;}
+    .client-card-dash .c-detail{font-size:0.82rem;color:var(--muted);}
+
+    @media(max-width:768px){
+      .sidebar{width:220px;}
+      .stat-cards{grid-template-columns:1fr 1fr;}
+      .clients-grid,.docs-grid{grid-template-columns:1fr 1fr;}
+      .detail-grid,.fp-row{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- APP LOADER -->
+<div id="app-loader">
+  <img src="mh-logo.png" alt="MH"/>
+  <div class="spinner"></div>
+  <p>Loading Portal...</p>
+</div>
+
+<!-- NOTIFICATION -->
+<div class="notif" id="notif"></div>
+
+<!-- ═══════ LOGIN ═══════ -->
+<div class="screen" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="mh-logo.png" alt="MH"/>
+      <span>MH Modern<br/>Highline Portal</span>
+    </div>
+
+    <!-- Login Form -->
+    <div id="login-form">
+      <h2 style="font-family:var(--head);font-size:1.6rem;font-weight:800;color:var(--navy);margin-bottom:0.4rem;">Welcome Back</h2>
+      <p style="font-size:0.88rem;color:var(--muted);margin-bottom:1.5rem;">Sign in to your MH portal account</p>
+      <div class="login-error" id="login-error"></div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="login-email" autocomplete="off" placeholder="you@company.com" onkeydown="if(event.key==='Enter')doLogin()"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-password" autocomplete="new-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+      </div>
+      <button class="login-btn" id="login-btn" onclick="doLogin()" disabled style="opacity:0.5;cursor:not-allowed;">Sign In →</button>
+      <p class="login-switch">Don't have an account? <a onclick="showSignup()">Sign up</a></p>
+    </div>
+
+    <!-- Signup Form -->
+    <div id="signup-form" style="display:none;">
+      <h2 style="font-family:var(--head);font-size:1.6rem;font-weight:800;color:var(--navy);margin-bottom:0.4rem;">Create Account</h2>
+      <p style="font-size:0.88rem;color:var(--muted);margin-bottom:1.5rem;">Register for client access to the MH portal</p>
+      <div class="login-error" id="signup-error"></div>
+      <div class="login-success" id="signup-success"></div>
+      <div class="fp-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="form-group"><label>Full Name</label><input type="text" id="signup-name" placeholder="Ahmed Hassan"/></div>
+        <div class="form-group"><label>Company</label><input type="text" id="signup-company" placeholder="Your company"/></div>
+      </div>
+      <div class="form-group"><label>Email</label><input type="email" id="signup-email" autocomplete="off" placeholder="you@company.com"/></div>
+      <div class="form-group"><label>Industry</label>
+        <select id="signup-industry" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:0.9rem;outline:none;">
+          <option>Automotive</option><option>Aerospace & Defense</option><option>Railways</option>
+          <option>Oil & Gas</option><option>Construction</option><option>Agriculture</option>
+          <option>Marine</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Password</label><input type="password" id="signup-password" autocomplete="new-password" placeholder="Min. 6 characters"/></div>
+      <button class="login-btn" id="signup-btn" onclick="doSignup()">Create Account →</button>
+      <p class="login-switch">Already have an account? <a onclick="showLogin()">Sign in</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ ADMIN DASHBOARD ═══════ -->
+<div class="screen" id="admin-screen">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <img src="mh-logo.png" alt="MH"/>
+      <div class="portal-badge">Admin Portal</div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar" id="admin-avatar">A</div>
+      <div><div class="user-name" id="admin-name">Admin</div><div class="user-role">Administrator</div></div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" onclick="showPanel('admin','overview',this)"><span class="ni-icon">📊</span> Dashboard</div>
+      <div class="nav-section-label">Enquiries</div>
+      <div class="nav-item" onclick="showPanel('admin','enquiries',this)"><span class="ni-icon">📬</span> All Enquiries <span class="ni-badge" id="new-badge">0</span></div>
+      <div class="nav-section-label">Clients & Orders</div>
+      <div class="nav-item" onclick="showPanel('admin','clients',this)"><span class="ni-icon">🏢</span> Clients</div>
+      <div class="nav-item" onclick="showPanel('admin','orders',this)"><span class="ni-icon">📦</span> Orders</div>
+      <div class="nav-section-label">Website</div>
+      <div class="nav-item" onclick="window.open('index.html','_blank')"><span class="ni-icon">🌐</span> View Website ↗</div>
+    </div>
+    <div class="sidebar-bottom">
+      <a href="index.html" class="logout-btn" style="margin-bottom:0.5rem;">🌐 Back to Website</a>
+      <button class="logout-btn" onclick="doLogout()">← Sign Out</button>
+    </div>
+      <span class="header-badge">Admin</span>
+    </div>
+    <div class="main-body">
+
+      <!-- OVERVIEW -->
+      <div class="panel active" id="admin-panel-overview">
+        <div class="stat-cards">
+          <div class="stat-card"><div class="stat-card-icon" style="background:#e8f4fb;">📬</div><div><div class="stat-card-num" id="stat-enquiries">0</div><div class="stat-card-label">Total Enquiries</div></div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:#d1fae5;">🏢</div><div><div class="stat-card-num" id="stat-clients">0</div><div class="stat-card-label">Registered Clients</div></div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:#fef3c7;">📦</div><div><div class="stat-card-num" id="stat-orders">0</div><div class="stat-card-label">Active Orders</div></div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:#ede9fe;">⏳</div><div><div class="stat-card-num" id="stat-new">0</div><div class="stat-card-label">New (Unread)</div></div></div>
+        </div>
+        <div class="data-table">
+          <div class="table-header"><h3>Recent Enquiries</h3></div>
+          <table><thead><tr><th>Name</th><th>Company</th><th>Type</th><th>Date</th><th>Status</th></tr></thead>
+          <tbody id="recent-body"><tr><td colspan="5" class="empty-state">Loading...</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- ENQUIRIES -->
+      <div class="panel" id="admin-panel-enquiries">
+        <div class="section-title"><h2>All Enquiries</h2><p>Manage incoming contact form submissions.</p></div>
+        <div class="data-table">
+          <div class="table-header"><h3>Inbox</h3><input class="table-search" placeholder="Search..." oninput="filterTable(this.value,'enq-body')"/></div>
+          <table><thead><tr><th>Name</th><th>Company</th><th>Type</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="enq-body"><tr><td colspan="6" class="empty-state">Loading...</td></tr></tbody></table>
+        </div>
+        <div class="enquiry-detail" id="enquiry-detail" style="display:none;">
+          <h4>Enquiry Detail</h4>
+          <div class="detail-grid">
+            <div class="detail-item"><label>Full Name</label><p id="det-name"></p></div>
+            <div class="detail-item"><label>Company</label><p id="det-company"></p></div>
+            <div class="detail-item"><label>Email</label><p id="det-email"></p></div>
+            <div class="detail-item"><label>Phone</label><p id="det-phone"></p></div>
+            <div class="detail-item"><label>Enquiry Type</label><p id="det-type"></p></div>
+            <div class="detail-item"><label>Date</label><p id="det-date"></p></div>
+          </div>
+          <div class="fp-group" style="margin-bottom:1rem;"><label>Message</label><div class="detail-message" id="det-message"></div></div>
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <div><label style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--light);display:block;margin-bottom:0.3rem;">Update Status</label>
+            <select class="status-select" id="det-status-select" onchange="updateEnquiryStatus(this.value)">
+              <option value="new">🔵 New</option><option value="pending">🟡 Pending</option><option value="done">🟢 Responded</option>
+            </select></div>
+            <button class="action-btn action-btn-blue" style="margin-top:1.3rem;" onclick="document.getElementById('enquiry-detail').style.display='none'">Close ✕</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLIENTS -->
+      <div class="panel" id="admin-panel-clients">
+        <div class="section-title"><h2>Registered Clients</h2><p>All users who have signed up for client access.</p></div>
+        <div class="data-table">
+          <div class="table-header"><h3>Client List</h3></div>
+          <table><thead><tr><th>Name</th><th>Company</th><th>Industry</th><th>Email</th><th>Joined</th><th>Actions</th></tr></thead>
+          <tbody id="clients-body"><tr><td colspan="6" class="empty-state">Loading...</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- ORDERS -->
+      <div class="panel" id="admin-panel-orders">
+        <div class="section-title"><h2>Orders</h2><p>Manage and track all client orders.</p></div>
+        <div class="data-table">
+          <div class="table-header"><h3>All Orders</h3><button class="action-btn action-btn-blue" onclick="showAddOrder()">+ New Order</button></div>
+          <table><thead><tr><th>Order #</th><th>Client</th><th>Product</th><th>Qty</th><th>Status</th><th>Due Date</th><th>Actions</th></tr></thead>
+          <tbody id="orders-body"><tr><td colspan="7" class="empty-state">No orders yet.</td></tr></tbody></table>
+        </div>
+        <div class="form-panel" id="add-order-form" style="display:none;">
+          <h3>Create New Order</h3>
+          <div class="fp-row">
+            <div class="fp-group"><label>Order Number</label><input type="text" id="ord-num" placeholder="MH-2026-001"/></div>
+            <div class="fp-group"><label>Client Email</label><input type="text" id="ord-client" placeholder="client@company.com"/></div>
+          </div>
+          <div class="fp-row">
+            <div class="fp-group"><label>Product</label><input type="text" id="ord-product" placeholder="Brake Hoses (SAE J1401)"/></div>
+            <div class="fp-group"><label>Quantity</label><input type="text" id="ord-qty" placeholder="500 units"/></div>
+          </div>
+          <div class="fp-row">
+            <div class="fp-group"><label>Status</label>
+              <select id="ord-status" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:0.9rem;outline:none;">
+                <option value="production">In Production</option><option value="qa">QA Testing</option>
+                <option value="dispatched">Dispatched</option>
+              </select>
+            </div>
+            <div class="fp-group"><label>Due Date</label><input type="text" id="ord-due" placeholder="25 May 2026"/></div>
+          </div>
+          <div class="fp-group"><label>Notes</label><textarea id="ord-notes" placeholder="Any additional notes..."></textarea></div>
+          <div style="display:flex;gap:1rem;">
+            <button class="submit-btn" onclick="createOrder()">Create Order</button>
+            <button class="action-btn action-btn-red" style="padding:12px 20px;" onclick="document.getElementById('add-order-form').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ CLIENT PORTAL ═══════ -->
+<div class="screen" id="client-screen">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <img src="mh-logo.png" alt="MH"/>
+      <div class="portal-badge">Client Portal</div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar" style="background:var(--green);" id="client-avatar">C</div>
+      <div><div class="user-name" id="client-name">Client</div><div class="user-role" id="client-company">—</div></div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section-label">My Account</div>
+      <div class="nav-item active" onclick="showPanel('client','overview',this)"><span class="ni-icon">🏠</span> Overview</div>
+      <div class="nav-item" onclick="showPanel('client','orders',this)"><span class="ni-icon">📦</span> My Orders</div>
+      <div class="nav-item" onclick="showPanel('client','enquiry',this)"><span class="ni-icon">📝</span> New Enquiry</div>
+      <div class="nav-item" onclick="showPanel('client','documents',this)"><span class="ni-icon">📄</span> Documents</div>
+      <div class="nav-section-label">Support</div>
+      <div class="nav-item" onclick="window.open('contact.html','_blank')"><span class="ni-icon">📞</span> Contact MH ↗</div>
+    </div>
+    <div class="sidebar-bottom">
+      <a href="index.html" class="logout-btn" style="margin-bottom:0.5rem;">🌐 Back to Website</a>
+      <button class="logout-btn" onclick="doLogout()">← Sign Out</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="main-header">
+      <h1 id="client-panel-title">My Overview</h1>
+      <span class="header-badge">Client Portal</span>
+    </div>
+    <div class="main-body">
+
+      <!-- CLIENT OVERVIEW -->
+      <div class="panel active" id="client-panel-overview">
+        <div class="stat-cards">
+          <div class="stat-card"><div class="stat-card-icon" style="background:#d1fae5;">📦</div><div><div class="stat-card-num" id="client-stat-orders">0</div><div class="stat-card-label">Active Orders</div></div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:#e8f4fb;">📬</div><div><div class="stat-card-num" id="client-stat-enquiries">0</div><div class="stat-card-label">My Enquiries</div></div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:#fef3c7;">✅</div><div><div class="stat-card-num" id="client-stat-done">0</div><div class="stat-card-label">Completed Orders</div></div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:#ede9fe;">📄</div><div><div class="stat-card-num">4</div><div class="stat-card-label">Documents</div></div></div>
+        </div>
+        <div class="data-table">
+          <div class="table-header"><h3>My Recent Orders</h3></div>
+          <table><thead><tr><th>Order #</th><th>Product</th><th>Qty</th><th>Status</th><th>Due Date</th></tr></thead>
+          <tbody id="client-orders-body"><tr><td colspan="5" class="empty-state">No orders yet. Contact MH to place your first order.</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- CLIENT ORDERS DETAIL -->
+      <div class="panel" id="client-panel-orders">
+        <div class="section-title"><h2>My Orders</h2><p>Track your active and past orders with MH.</p></div>
+        <div id="client-orders-detail"><div class="empty-state" style="background:var(--white);border-radius:var(--radius);padding:3rem;box-shadow:var(--shadow);">No orders yet. Contact MH to place your first order.</div></div>
+      </div>
+
+      <!-- CLIENT ENQUIRY -->
+      <div class="panel" id="client-panel-enquiry">
+        <div class="section-title"><h2>New Enquiry</h2><p>Submit a product enquiry or reorder request.</p></div>
+        <div class="form-panel">
+          <h3>Submit an Enquiry</h3>
+          <div class="fp-row">
+            <div class="fp-group"><label>Your Name</label><input type="text" id="enq-name" placeholder="Full name"/></div>
+            <div class="fp-group"><label>Company</label><input type="text" id="enq-company" placeholder="Company name"/></div>
+          </div>
+          <div class="fp-group"><label>Email</label><input type="email" id="enq-email" placeholder="your@email.com"/></div>
+          <div class="fp-group"><label>Phone</label><input type="tel" id="enq-phone" placeholder="+20..."/></div>
+          <div class="fp-group"><label>Enquiry Type</label>
+            <select id="enq-type" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:0.9rem;outline:none;">
+              <option>New Product Enquiry</option><option>Reorder Request</option>
+              <option>Technical Question</option><option>Custom Manufacturing</option><option>General Enquiry</option>
+            </select>
+          </div>
+          <div class="fp-group"><label>Message</label><textarea id="enq-message" placeholder="Describe your requirements..."></textarea></div>
+          <button class="submit-btn" onclick="submitEnquiry()">Submit Enquiry →</button>
+          <div class="success-msg" id="enq-success">✓ Enquiry submitted! MH will respond within 24 hours.</div>
+        </div>
+      </div>
+
+      <!-- DOCUMENTS -->
+      <div class="panel" id="client-panel-documents">
+        <div class="section-title"><h2>Documents</h2><p>Download your certificates and quality documents.</p></div>
+        <div class="docs-grid">
+          <div class="doc-card"><div class="doc-icon">📋</div><div class="doc-name">IATF 16949:2016 Certificate</div><div class="doc-size">PDF · 245 KB</div><button class="doc-btn" onclick="showNotif('Download started','success')">Download</button></div>
+          <div class="doc-card"><div class="doc-icon">🧪</div><div class="doc-name">Quality Assurance Overview</div><div class="doc-size">PDF · 890 KB</div><button class="doc-btn" onclick="showNotif('Download started','success')">Download</button></div>
+          <div class="doc-card"><div class="doc-icon">📦</div><div class="doc-name">Product Catalogue</div><div class="doc-size">PDF · 2.1 MB</div><button class="doc-btn" onclick="showNotif('Download started','success')">Download</button></div>
+          <div class="doc-card"><div class="doc-icon">✅</div><div class="doc-name">Testing Capabilities</div><div class="doc-size">PDF · 450 KB</div><button class="doc-btn" onclick="showNotif('Download started','success')">Download</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SUPABASE INIT ──
+const ADMIN_EMAIL = 'admin@mhhose.com';
+let currentUser = null;
+let currentProfile = null;
+let selectedEnquiryId = null;
+
+// ── INIT ──
+window.addEventListener('load', async () => {
+  // Clear login fields and enable button only when user types
+  setTimeout(() => {
+    const emailEl = document.getElementById('login-email');
+    const passEl = document.getElementById('login-password');
+    const btn = document.getElementById('login-btn');
+    if (emailEl) emailEl.value = '';
+    if (passEl) passEl.value = '';
+    function checkFields() {
+      if (emailEl.value.trim() && passEl.value.trim()) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+      }
+    }
+    if (emailEl) emailEl.addEventListener('input', checkFields);
+    if (passEl) passEl.addEventListener('input', checkFields);
+  }, 200);
+
+  // Add timeout so loader never gets stuck
+  setTimeout(() => {
+    hideLoader();
+    showScreen('login-screen');
+  }, 4000);
+
+  const saved = sessionStorage.getItem('mh_user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      currentProfile = JSON.parse(sessionStorage.getItem('mh_profile') || 'null');
+      showDashboard();
+    } catch(e) {
+      sessionStorage.clear();
+      hideLoader();
+      showScreen('login-screen');
+    }
+  } else {
+    hideLoader();
+    showScreen('login-screen');
+  }
+});
+
+function hideLoader() { document.getElementById('app-loader').style.display = 'none'; }
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showDashboard() {
+  hideLoader();
+  const isAdmin = currentUser.email === ADMIN_EMAIL;
+  if (isAdmin) {
+    showScreen('admin-screen');
+    document.getElementById('admin-name').textContent = 'Admin';
+    document.getElementById('admin-avatar').textContent = 'A';
+    loadAdminData();
+  } else {
+    showScreen('client-screen');
+    if (currentProfile) {
+      document.getElementById('client-name').textContent = currentProfile.full_name || currentUser.email;
+      document.getElementById('client-company').textContent = currentProfile.company || '';
+      document.getElementById('client-avatar').textContent = (currentProfile.full_name || 'C')[0].toUpperCase();
+      document.getElementById('enq-name').value = currentProfile.full_name || '';
+      document.getElementById('enq-company').value = currentProfile.company || '';
+      document.getElementById('enq-email').value = currentUser.email || '';
+    }
+    loadClientData();
+  }
+}
+
+// ── AUTH ──
+function showSignup() { document.getElementById('login-form').style.display='none'; document.getElementById('signup-form').style.display='block'; }
+function showLogin() { document.getElementById('signup-form').style.display='none'; document.getElementById('login-form').style.display='block'; }
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-password').value.trim();
+  const err = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  err.style.display='none';
+  if (!email || !pass) { err.textContent='Please enter email and password.'; err.style.display='block'; return; }
+  btn.disabled=true; btn.textContent='Signing in...';
+  try {
+    const data = await supaAuth(email, pass);
+    if (data.error || !data.access_token) throw new Error(data.error_description || data.msg || 'Invalid email or password');
+    sessionStorage.setItem('mh_token', data.access_token);
+    currentUser = data.user;
+    sessionStorage.setItem('mh_user', JSON.stringify(currentUser));
+    // load profile
+    const profiles = await supaQuery('profiles', { select: '*', eq: { id: currentUser.id } });
+    currentProfile = Array.isArray(profiles) ? profiles[0] : null;
+    sessionStorage.setItem('mh_profile', JSON.stringify(currentProfile));
+    showDashboard();
+  } catch(e) {
+    err.textContent = e.message || 'Login failed. Please try again.';
+    err.style.display='block';
+    btn.disabled=false;
+    btn.textContent='Sign In →';
+  }
+}
+
+async function doSignup() {
+  const name = document.getElementById('signup-name').value.trim();
+  const company = document.getElementById('signup-company').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const industry = document.getElementById('signup-industry').value;
+  const pass = document.getElementById('signup-password').value.trim();
+  const err = document.getElementById('signup-error');
+  const success = document.getElementById('signup-success');
+  const btn = document.getElementById('signup-btn');
+  err.style.display='none'; success.style.display='none';
+  if (!name||!email||!pass) { err.textContent='Please fill all required fields.'; err.style.display='block'; return; }
+  btn.disabled=true; btn.textContent='Creating account...';
+  try {
+    const res = await fetch(`${SUPA_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
+      body: JSON.stringify({ email, password: pass, data: { full_name: name, company, industry } })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.msg || data.error);
+    // Insert profile
+    if (data.id) {
+      await supaInsert('profiles', { id: data.id, email, full_name: name, company, industry, role: 'client' });
+    }
+    success.textContent = '✓ Account created! You can now sign in.';
+    success.style.display='block';
+    setTimeout(showLogin, 2000);
+  } catch(e) {
+    err.textContent = e.message || 'Signup failed. Please try again.';
+    err.style.display='block';
+  }
+  btn.disabled=false; btn.textContent='Create Account →';
+}
+
+function doLogout() {
+  sessionStorage.clear();
+  currentUser=null; currentProfile=null;
+  showScreen('login-screen');
+  setTimeout(() => {
+    const emailEl = document.getElementById('login-email');
+    const passEl = document.getElementById('login-password');
+    if (emailEl) emailEl.value = '';
+    if (passEl) passEl.value = '';
+  }, 100);
+  showNotif('Signed out successfully','success');
+}
+
+// ── PANELS ──
+function showPanel(role, name, el) {
+  document.querySelectorAll(`#${role}-screen .panel`).forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll(`#${role}-screen .nav-item`).forEach(n=>n.classList.remove('active'));
+  document.getElementById(`${role}-panel-${name}`).classList.add('active');
+  if (el) el.classList.add('active');
+  const titles={overview:'Dashboard Overview',enquiries:'All Enquiries',clients:'Clients',orders:'Orders'};
+  const clientTitles={overview:'My Overview',orders:'My Orders',enquiry:'New Enquiry',documents:'Documents'};
+  const t = role==='admin'?titles:clientTitles;
+  document.getElementById(`${role}-panel-title`).textContent = t[name]||name;
+}
+
+// ── ADMIN DATA ──
+async function loadAdminData() {
+  try {
+    const [enquiries, profiles, orders] = await Promise.all([
+      supaQuery('enquiries', { select: '*', order: 'created_at.desc' }),
+      supaQuery('profiles', { select: '*', order: 'created_at.desc' }),
+      supaQuery('orders', { select: '*', order: 'created_at.desc' }),
+    ]);
+    const enqList = Array.isArray(enquiries) ? enquiries : [];
+    const profList = Array.isArray(profiles) ? profiles.filter(p => p.email !== ADMIN_EMAIL) : [];
+    const ordList = Array.isArray(orders) ? orders : [];
+    const newCount = enqList.filter(e=>e.status==='new').length;
+    document.getElementById('stat-enquiries').textContent = enqList.length;
+    document.getElementById('stat-clients').textContent = profList.length;
+    document.getElementById('stat-orders').textContent = ordList.filter(o=>o.status!=='dispatched').length;
+    document.getElementById('stat-new').textContent = newCount;
+    document.getElementById('new-badge').textContent = newCount;
+    renderRecentEnquiries(enqList.slice(0,5));
+    renderEnquiries(enqList);
+    renderClients(profList);
+    renderOrders(ordList);
+  } catch(e) { console.error(e); }
+}
+
+function statusLabel(s){return{new:'🔵 New',pending:'🟡 Pending',done:'🟢 Responded'}[s]||s;}
+function orderStatusLabel(s){return{production:'In Production',qa:'QA Testing',dispatched:'Dispatched',cancelled:'Cancelled'}[s]||s;}
+function formatDate(d){return d?new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';}
+
+function renderRecentEnquiries(data) {
+  const tbody = document.getElementById('recent-body');
+  if (!data.length){tbody.innerHTML='<tr><td colspan="5" class="empty-state">No enquiries yet.</td></tr>';return;}
+  tbody.innerHTML = data.map(e=>`<tr><td class="td-name">${e.name||'—'}</td><td>${e.company||'—'}</td><td>${e.enquiry_type||'—'}</td><td>${formatDate(e.created_at)}</td><td><span class="badge badge-${e.status}">${statusLabel(e.status)}</span></td></tr>`).join('');
+}
+
+function renderEnquiries(data) {
+  const tbody = document.getElementById('enq-body');
+  if (!data.length){tbody.innerHTML='<tr><td colspan="6" class="empty-state">No enquiries yet.</td></tr>';return;}
+  tbody.innerHTML = data.map(e=>`<tr><td class="td-name">${e.name||'—'}</td><td>${e.company||'—'}</td><td>${e.enquiry_type||'—'}</td><td>${formatDate(e.created_at)}</td><td><span class="badge badge-${e.status}">${statusLabel(e.status)}</span></td><td style="display:flex;gap:0.4rem;"><button class="action-btn action-btn-blue" onclick="viewEnquiry('${e.id}')">View</button><button class="action-btn action-btn-green" onclick="markEnquiryDone('${e.id}')">✓</button></td></tr>`).join('');
+}
+
+function filterTable(val, tbodyId) {
+  document.getElementById(tbodyId).querySelectorAll('tr').forEach(r=>{
+    r.style.display = r.textContent.toLowerCase().includes(val.toLowerCase())?'':'none';
+  });
+}
+
+async function viewEnquiry(id) {
+  const data = await supaQuery('enquiries', { select: '*', eq: { id } });
+  const e = Array.isArray(data) ? data[0] : null;
+  if (!e) return;
+  selectedEnquiryId = id;
+  document.getElementById('det-name').textContent = e.name||'—';
+  document.getElementById('det-company').textContent = e.company||'—';
+  document.getElementById('det-email').textContent = e.email||'—';
+  document.getElementById('det-phone').textContent = e.phone||'—';
+  document.getElementById('det-type').textContent = e.enquiry_type||'—';
+  document.getElementById('det-date').textContent = formatDate(e.created_at);
+  document.getElementById('det-message').textContent = e.message||'—';
+  document.getElementById('det-status-select').value = e.status||'new';
+  document.getElementById('enquiry-detail').style.display='block';
+  document.getElementById('enquiry-detail').scrollIntoView({behavior:'smooth'});
+  if (e.status==='new') { await supaUpdate('enquiries',{status:'pending'},{id}); loadAdminData(); }
+}
+
+async function updateEnquiryStatus(val) {
+  if (!selectedEnquiryId) return;
+  await supaUpdate('enquiries',{status:val},{id:selectedEnquiryId});
+  showNotif('Status updated','success'); loadAdminData();
+}
+
+async function markEnquiryDone(id) {
+  await supaUpdate('enquiries',{status:'done'},{id});
+  showNotif('Marked as responded','success'); loadAdminData();
+}
+
+function renderClients(data) {
+  const tbody = document.getElementById('clients-body');
+  if (!data.length){tbody.innerHTML='<tr><td colspan="6" class="empty-state">No clients registered yet.</td></tr>';return;}
+  tbody.innerHTML = data.map(p=>`<tr><td class="td-name">${p.full_name||'—'}</td><td>${p.company||'—'}</td><td>${p.industry||'—'}</td><td>${p.email||'—'}</td><td>${formatDate(p.created_at)}</td><td><button class="action-btn action-btn-blue" onclick="addOrderForClient('${p.email}')">Add Order</button></td></tr>`).join('');
+}
+
+function renderOrders(data) {
+  const tbody = document.getElementById('orders-body');
+  if (!data.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">No orders yet.</td></tr>';return;}
+  tbody.innerHTML = data.map(o=>`<tr><td class="td-name">${o.order_number||'—'}</td><td>${o.client_email||'—'}</td><td>${o.product||'—'}</td><td>${o.quantity||'—'}</td><td><span class="badge badge-${o.status}">${orderStatusLabel(o.status)}</span></td><td>${o.due_date||'—'}</td><td><select style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.78rem;" onchange="updateOrderStatus('${o.id}',this.value)"><option value="production" ${o.status==='production'?'selected':''}>In Production</option><option value="qa" ${o.status==='qa'?'selected':''}>QA Testing</option><option value="dispatched" ${o.status==='dispatched'?'selected':''}>Dispatched</option><option value="cancelled" ${o.status==='cancelled'?'selected':''}>Cancelled</option></select></td></tr>`).join('');
+}
+
+function showAddOrder() { document.getElementById('add-order-form').style.display='block'; document.getElementById('add-order-form').scrollIntoView({behavior:'smooth'}); }
+function addOrderForClient(email) { showPanel('admin','orders',null); document.querySelectorAll('#admin-screen .nav-item')[3].classList.add('active'); setTimeout(()=>{ showAddOrder(); document.getElementById('ord-client').value=email; },100); }
+
+async function createOrder() {
+  const num = document.getElementById('ord-num').value.trim();
+  const clientEmail = document.getElementById('ord-client').value.trim();
+  const product = document.getElementById('ord-product').value.trim();
+  const qty = document.getElementById('ord-qty').value.trim();
+  const status = document.getElementById('ord-status').value;
+  const due = document.getElementById('ord-due').value.trim();
+  const notes = document.getElementById('ord-notes').value.trim();
+  if (!num||!product) { showNotif('Please fill order number and product','error'); return; }
+  // Find client by email
+  let clientId = null;
+  if (clientEmail) {
+    const profiles = await supaQuery('profiles', { select: 'id', eq: { email: clientEmail } });
+    if (Array.isArray(profiles) && profiles[0]) clientId = profiles[0].id;
+  }
+  const ok = await supaInsert('orders', { order_number:num, client_id:clientId, client_email:clientEmail, product, quantity:qty, status, due_date:due, notes });
+  if (!ok) { showNotif('Error creating order','error'); return; }
+  showNotif('Order created!','success');
+  document.getElementById('add-order-form').style.display='none';
+  loadAdminData();
+}
+
+async function updateOrderStatus(id, status) {
+  await supaUpdate('orders',{status},{id});
+  showNotif('Order updated','success'); loadAdminData();
+}
+
+// ── CLIENT DATA ──
+async function loadClientData() {
+  try {
+    const [orders, enquiries] = await Promise.all([
+      supaQuery('orders', { select: '*', eq: { client_id: currentUser.id }, order: 'created_at.desc' }),
+      supaQuery('enquiries', { select: '*', eq: { user_id: currentUser.id }, order: 'created_at.desc' }),
+    ]);
+    const ordList = Array.isArray(orders) ? orders : [];
+    const enqList = Array.isArray(enquiries) ? enquiries : [];
+    document.getElementById('client-stat-orders').textContent = ordList.filter(o=>o.status!=='dispatched').length;
+    document.getElementById('client-stat-enquiries').textContent = enqList.length;
+    document.getElementById('client-stat-done').textContent = ordList.filter(o=>o.status==='dispatched').length;
+    renderClientOrdersTable(ordList.slice(0,5));
+    renderClientOrdersDetail(ordList);
+  } catch(e) { console.error(e); }
+}
+
+function renderClientOrdersTable(orders) {
+  const tbody = document.getElementById('client-orders-body');
+  if (!orders.length){tbody.innerHTML='<tr><td colspan="5" class="empty-state">No orders yet.</td></tr>';return;}
+  tbody.innerHTML = orders.map(o=>`<tr><td class="td-name">${o.order_number||'—'}</td><td>${o.product||'—'}</td><td>${o.quantity||'—'}</td><td><span class="badge badge-${o.status}">${orderStatusLabel(o.status)}</span></td><td>${o.due_date||'—'}</td></tr>`).join('');
+}
+
+function renderClientOrdersDetail(orders) {
+  const wrap = document.getElementById('client-orders-detail');
+  if (!orders.length){wrap.innerHTML='<div class="empty-state" style="background:var(--white);border-radius:var(--radius);padding:3rem;box-shadow:var(--shadow);">No orders yet. Contact MH to place your first order.</div>';return;}
+  const steps = ['Order Confirmed','Raw Materials Received & Inspected','Manufacturing In Progress','QA Testing & Final Approval','Dispatched'];
+  const statusIndex = {production:2,qa:3,dispatched:4,cancelled:0};
+  wrap.innerHTML = orders.map(o=>{
+    const idx = statusIndex[o.status]??0;
+    const timeline = steps.map((s,i)=>`<div class="timeline-item"><div class="timeline-dot ${i<idx?'done':i===idx?'active':''}"></div><div class="timeline-title">${s}</div><div class="timeline-sub">${i===idx?'Currently here':i<idx?'Complete':'Pending'}</div></div>`).join('');
+    return `<div class="order-card"><div class="order-card-header"><div><div style="font-family:var(--head);font-size:1rem;font-weight:700;color:var(--navy);">${o.order_number||'—'} — ${o.product||'—'}</div><div style="font-size:0.8rem;color:var(--muted);">${o.quantity||''} · Due: ${o.due_date||'TBD'}</div></div><span class="badge badge-${o.status}">${orderStatusLabel(o.status)}</span></div><div class="order-timeline">${timeline}</div></div>`;
+  }).join('');
+}
+
+async function submitEnquiry() {
+  const name = document.getElementById('enq-name').value.trim();
+  const company = document.getElementById('enq-company').value.trim();
+  const email = document.getElementById('enq-email').value.trim();
+  const phone = document.getElementById('enq-phone').value.trim();
+  const type = document.getElementById('enq-type').value;
+  const message = document.getElementById('enq-message').value.trim();
+  if (!name||!message) { showNotif('Please fill name and message','error'); return; }
+  const payload = { name, company, email, phone, enquiry_type:type, message, status:'new' };
+  if (currentUser && currentUser.id) payload.user_id = currentUser.id;
+  const ok = await supaInsert('enquiries', payload);
+  if (!ok) { showNotif('Error submitting enquiry','error'); return; }
+  document.getElementById('enq-success').style.display='block';
+  document.getElementById('enq-message').value='';
+  showNotif('Enquiry submitted!','success');
+  loadClientData();
+}
+
+function showNotif(msg, type='success') {
+  const el = document.getElementById('notif');
+  el.textContent = (type==='success'?'✓ ':'✕ ')+msg;
+  el.className = `notif ${type} show`;
+  setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+
+</script>
+</body>
+</html>
