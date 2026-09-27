@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contact Us — MH Modern Highline</title>
+  <link rel="stylesheet" href="../style.css"/>
+  <style>
+    .contact-section { max-width: 800px; margin: 0 auto; }
+    .contact-form { background: var(--white); border-radius: 8px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .form-group { margin-bottom: 1.5rem; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--navy); font-size: 0.9rem; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: var(--font);
+      font-size: 0.95rem;
+    }
+    .form-group textarea { resize: vertical; min-height: 120px; }
+    .form-submit {
+      background: var(--blue);
+      color: white;
+      padding: 12px 28px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 0.95rem;
+    }
+    .form-submit:hover { background: var(--blue-dark); }
+    .form-submit:disabled { background: #ccc; cursor: not-allowed; }
+    .form-message { margin-top: 1rem; padding: 1rem; border-radius: 6px; display: none; }
+    .form-message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+    .form-message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div id="nav-placeholder"></div>
+
+<section class="page-hero">
+  <div class="container">
+    <h1>Get in Touch</h1>
+    <p>Have a question? Need a quote? Our team is here to help.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="contact-section">
+      <div class="contact-form">
+        <h2 style="margin-bottom: 2rem; color: var(--navy);">Send us a Message</h2>
+
+        <form id="contactForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="firstName">First Name *</label>
+              <input type="text" id="firstName" name="firstName" required/>
+            </div>
+            <div class="form-group">
+              <label for="lastName">Last Name *</label>
+              <input type="text" id="lastName" name="lastName" required/>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="company">Company</label>
+            <input type="text" id="company" name="company"/>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email *</label>
+            <input type="email" id="email" name="email" required/>
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="tel" id="phone" name="phone"/>
+          </div>
+
+          <div class="form-group">
+            <label for="subject">Subject *</label>
+            <select id="subject" name="subject" required>
+              <option value="">Select a topic...</option>
+              <option value="product-enquiry">Product Enquiry</option>
+              <option value="quote-request">Request a Quote</option>
+              <option value="technical">Technical Assistance</option>
+              <option value="custom">Custom Manufacturing Request</option>
+              <option value="partnership">Partnership / Distribution</option>
+              <option value="general">General Enquiry</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="message">Message *</label>
+            <textarea id="message" name="message" required></textarea>
+          </div>
+
+          <button type="submit" class="form-submit">Send Message</button>
+          <div id="formMessage" class="form-message"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="footer-placeholder"></div>
+
+<script src="../shared.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD_example_key_placeholder",
+    authDomain: "mh-modern-highline.firebaseapp.com",
+    projectId: "mh-modern-highline",
+    storageBucket: "mh-modern-highline.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abc123def456"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const form = document.getElementById('contactForm');
+  const messageDiv = document.getElementById('formMessage');
+  const submitBtn = form.querySelector('.form-submit');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+    messageDiv.className = 'form-message';
+
+    try {
+      const formData = {
+        firstName: document.getElementById('firstName').value,
+        lastName: document.getElementById('lastName').value,
+        company: document.getElementById('company').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        subject: document.getElementById('subject').value,
+        message: document.getElementById('message').value,
+        timestamp: serverTimestamp(),
+        status: 'new',
+        read: false
+      };
+
+      await addDoc(collection(db, "contacts"), formData);
+
+      messageDiv.textContent = '✓ Message sent successfully! We\'ll get back to you shortly.';
+      messageDiv.className = 'form-message success';
+      form.reset();
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Message';
+    } catch (error) {
+      console.error('Error:', error);
+      messageDiv.textContent = '✗ Error sending message. Please try again.';
+      messageDiv.className = 'form-message error';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Message';
+    }
+  });
+</script>
+</body>
+</html>

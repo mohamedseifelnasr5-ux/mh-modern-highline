@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Panel — MH Modern Highline</title>
+  <link rel="stylesheet" href="../style.css"/>
+  <style>
+    body { background: var(--off); }
+    .admin-container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3rem; }
+    .admin-header h1 { color: var(--navy); }
+    .logout-btn { background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; }
+    .logout-btn:hover { background: #c82333; }
+
+    .login-form { max-width: 400px; margin: 6rem auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: var(--shadow-lg); }
+    .login-form h2 { color: var(--navy); margin-bottom: 1.5rem; }
+    .login-form input { width: 100%; padding: 0.75rem; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 6px; }
+    .login-form button { width: 100%; background: var(--blue); color: white; padding: 0.75rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .login-form button:hover { background: var(--blue-dark); }
+
+    .admin-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 3rem; }
+    .stat-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: var(--shadow); }
+    .stat-card h3 { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .stat-card .number { font-size: 2rem; font-weight: 700; color: var(--blue); }
+
+    .admin-section { background: white; padding: 2rem; border-radius: 8px; box-shadow: var(--shadow); margin-bottom: 2rem; }
+    .admin-section h2 { color: var(--navy); margin-bottom: 1.5rem; border-bottom: 2px solid var(--blue); padding-bottom: 1rem; }
+
+    .table-responsive { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: var(--off); color: var(--navy); padding: 1rem; text-align: left; font-weight: 600; border-bottom: 2px solid var(--border); }
+    td { padding: 1rem; border-bottom: 1px solid var(--border); }
+    tr:hover { background: var(--off); }
+
+    .status-badge { display: inline-block; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+    .status-new { background: #cce5ff; color: var(--blue); }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-read { background: #d4edda; color: #155724; }
+    .status-responded { background: #d1ecf1; color: #0c5460; }
+
+    .action-btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    .btn-view { background: var(--blue); color: white; }
+    .btn-view:hover { background: var(--blue-dark); }
+    .btn-mark-read { background: #28a745; color: white; }
+    .btn-mark-read:hover { background: #218838; }
+    .btn-delete { background: #dc3545; color: white; }
+    .btn-delete:hover { background: #c82333; }
+
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+    .modal.open { display: flex; }
+    .modal-content { background: white; padding: 2rem; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .modal-close { float: right; background: none; border: none; font-size: 2rem; cursor: pointer; color: var(--muted); }
+
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+    .empty-state p { font-size: 1.1rem; }
+
+    @media (max-width: 1024px) { .admin-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 768px) { .admin-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<!-- Login Form -->
+<div id="loginSection" class="login-form">
+  <h2>Admin Login</h2>
+  <input type="email" id="adminEmail" placeholder="Email" />
+  <input type="password" id="adminPassword" placeholder="Password" />
+  <button onclick="handleLogin()">Login</button>
+  <p style="text-align: center; margin-top: 1rem; color: var(--muted); font-size: 0.9rem;">
+    Default: admin@mhhose.com / password
+  </p>
+  <div id="loginError" style="color: #dc3545; margin-top: 1rem; display: none;"></div>
+</div>
+
+<!-- Admin Dashboard -->
+<div id="adminDashboard" style="display: none;">
+  <div class="admin-container">
+    <div class="admin-header">
+      <div>
+        <h1>📊 Admin Dashboard</h1>
+        <p style="color: var(--muted); margin-top: 0.5rem;">MH Modern Highline Management</p>
+      </div>
+      <button class="logout-btn" onclick="handleLogout()">Logout</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="admin-grid">
+      <div class="stat-card">
+        <h3>Total Contacts</h3>
+        <div class="number" id="totalContacts">0</div>
+      </div>
+      <div class="stat-card">
+        <h3>New Messages</h3>
+        <div class="number" id="newContacts">0</div>
+      </div>
+      <div class="stat-card">
+        <h3>Quote Requests</h3>
+        <div class="number" id="totalQuotes">0</div>
+      </div>
+      <div class="stat-card">
+        <h3>Pending Quotes</h3>
+        <div class="number" id="pendingQuotes">0</div>
+      </div>
+    </div>
+
+    <!-- Contact Submissions -->
+    <div class="admin-section">
+      <h2>📧 Contact Form Submissions</h2>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Subject</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="contactsTable">
+            <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Quote Requests -->
+    <div class="admin-section">
+      <h2>💰 Quote Requests</h2>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Contact</th>
+              <th>Products</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="quotesTable">
+            <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div id="detailModal" class="modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, deleteDoc, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD_example_key_placeholder",
+    authDomain: "mh-modern-highline.firebaseapp.com",
+    projectId: "mh-modern-highline",
+    storageBucket: "mh-modern-highline.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abc123def456"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Simple auth (for demo - use proper auth in production)
+  window.handleLogin = function() {
+    const email = document.getElementById('adminEmail').value;
+    const password = document.getElementById('adminPassword').value;
+
+    if (email === 'admin@mhhose.com' && password === 'password') {
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('adminDashboard').style.display = 'block';
+      loadData();
+    } else {
+      document.getElementById('loginError').textContent = 'Invalid credentials';
+      document.getElementById('loginError').style.display = 'block';
+    }
+  };
+
+  window.handleLogout = function() {
+    document.getElementById('loginSection').style.display = 'block';
+    document.getElementById('adminDashboard').style.display = 'none';
+    document.getElementById('adminEmail').value = '';
+    document.getElementById('adminPassword').value = '';
+  };
+
+  async function loadData() {
+    // Load contacts
+    const contactsSnapshot = await getDocs(collection(db, "contacts"));
+    const contacts = contactsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Load quotes
+    const quotesSnapshot = await getDocs(collection(db, "quotes"));
+    const quotes = quotesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Update stats
+    document.getElementById('totalContacts').textContent = contacts.length;
+    document.getElementById('newContacts').textContent = contacts.filter(c => c.status === 'new').length;
+    document.getElementById('totalQuotes').textContent = quotes.length;
+    document.getElementById('pendingQuotes').textContent = quotes.filter(q => q.status === 'pending').length;
+
+    // Populate tables
+    populateContactsTable(contacts, db);
+    populateQuotesTable(quotes, db);
+  }
+
+  function populateContactsTable(contacts, db) {
+    const tbody = document.getElementById('contactsTable');
+    if (contacts.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No contact submissions yet</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = contacts.map(contact => `
+      <tr>
+        <td>${contact.firstName} ${contact.lastName}</td>
+        <td>${contact.email}</td>
+        <td>${contact.subject || '-'}</td>
+        <td>${contact.timestamp ? new Date(contact.timestamp.toDate()).toLocaleDateString() : '-'}</td>
+        <td><span class="status-badge status-${contact.status}">${contact.status}</span></td>
+        <td>
+          <button class="action-btn btn-view" onclick="viewContact('${contact.id}')">View</button>
+          <button class="action-btn btn-mark-read" onclick="markContactRead('${contact.id}')">Mark Read</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function populateQuotesTable(quotes, db) {
+    const tbody = document.getElementById('quotesTable');
+    if (quotes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No quote requests yet</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = quotes.map(quote => `
+      <tr>
+        <td>${quote.company}</td>
+        <td>${quote.firstName} ${quote.lastName}</td>
+        <td>${Array.isArray(quote.products) ? quote.products.join(', ') : quote.products}</td>
+        <td>${quote.timestamp ? new Date(quote.timestamp.toDate()).toLocaleDateString() : '-'}</td>
+        <td><span class="status-badge status-${quote.status}">${quote.status}</span></td>
+        <td>
+          <button class="action-btn btn-view" onclick="viewQuote('${quote.id}')">View</button>
+          <button class="action-btn btn-mark-read" onclick="markQuoteRead('${quote.id}')">Mark Read</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  window.viewContact = function(id) {
+    // Load and display contact details
+    alert('Contact details feature coming soon');
+  };
+
+  window.viewQuote = function(id) {
+    alert('Quote details feature coming soon');
+  };
+
+  window.markContactRead = async function(id) {
+    await updateDoc(doc(db, "contacts", id), { status: 'read', read: true });
+    loadData();
+  };
+
+  window.markQuoteRead = async function(id) {
+    await updateDoc(doc(db, "quotes", id), { status: 'read', read: true });
+    loadData();
+  };
+
+  window.closeModal = function() {
+    document.getElementById('detailModal').classList.remove('open');
+  };
+</script>
+</body>
+</html>
