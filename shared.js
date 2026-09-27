@@ -20,14 +20,6 @@ const NAV_HTML = `
       <li><a href="products.html">Products</a></li>
       <li><a href="industries.html">Industries</a></li>
       <li>
-        <a href="quote-system/">Solutions ▾</a>
-        <div class="dropdown">
-          <a href="quote-system/">Request Quote</a>
-          <a href="contact-form/">Contact Form</a>
-          <a href="admin/">Admin Panel</a>
-        </div>
-      </li>
-      <li>
         <a href="gallery.html">Gallery ▾</a>
         <div class="dropdown">
           <a href="gallery.html">Photo Gallery</a>
