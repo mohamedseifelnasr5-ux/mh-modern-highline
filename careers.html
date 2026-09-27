@@ -88,5 +88,23 @@
 
 <div id="footer-placeholder"></div>
 <script src="shared.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+  import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-analytics.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD3aLG20fCBwMv-5yuj0CLS4EkKTXHhRg4",
+    authDomain: "mh-modern-highline.firebaseapp.com",
+    projectId: "mh-modern-highline",
+    storageBucket: "mh-modern-highline.firebasestorage.app",
+    messagingSenderId: "798286234103",
+    appId: "1:798286234103:web:0c2f291938f952f4416ef2",
+    measurementId: "G-65DJRE0D8K"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+  logEvent(analytics, 'page_view', { page_title: 'Careers' });
+</script>
 </body>
 </html>
